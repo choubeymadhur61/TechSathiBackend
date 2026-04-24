@@ -1,5 +1,6 @@
 const User = require('../Models/User');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
 
 // Helper function to send Email
 const sendOTPEmail = async (email, otp, name) => {
@@ -69,7 +70,18 @@ exports.verifyOTP = async (req, res) => {
         user.otp = undefined; 
         await user.save();
 
-        res.status(200).json({ message: "Verification successful!", user });
+        // 🛡️ GENERATE JWT TOKEN
+        const token = jwt.sign(
+            { userId: user._id, email: user.email },
+            process.env.JWT_SECRET, // We must add this to your .env file
+            { expiresIn: '7d' } // User stays logged in for 7 days
+        );
+
+        res.status(200).json({ 
+            message: "Verification successful!", 
+            token, // Send the token to the frontend
+            user: { name: user.name, email: user.email, location: user.location }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
