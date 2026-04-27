@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
+console.log("Email User:", process.env.EMAIL_USER); // Terminal mein check karein
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -17,6 +19,11 @@ mongoose.connect("mongodb://localhost:27017/techsathi")
 const authRoutes = require('./Routes/authRoute'); 
 
 app.use('/api', authRoutes);
+
+// Service Routes
+// const serviceRoutes = require('./Routes/ServiceRoute');
+const servicesroutes = require ('./Routes/ServiceRoute');
+app.use('/api', servicesroutes);
 
 // Use a fallback port if .env is missing
 const PORT = process.env.PORT || 5000;

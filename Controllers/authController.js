@@ -1,16 +1,26 @@
 const User = require('../Models/User');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
+
 
 // Helper function to send Email
 const sendOTPEmail = async (email, otp, name) => {
+    // Check if variables exist
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        throw new Error("Missing EMAIL_USER or EMAIL_PASS in .env file");
+    }
+
     const transporter = nodemailer.createTransport({
         service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        auth: { 
+            user: process.env.EMAIL_USER, 
+            pass: process.env.EMAIL_PASS 
+        }
     });
 
     await transporter.sendMail({
-        from: '"TechSathi Support" <techsathi@gmail.com>',
+        from: `"TechSathi Support" <${process.env.EMAIL_USER}>`, // env variable use karein
         to: email,
         subject: 'Your Verification Code',
         html: `<h3>Hello ${name},</h3><p>Your OTP is: <b>${otp}</b></p>`
