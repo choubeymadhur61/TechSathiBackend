@@ -3,31 +3,78 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-console.log("Email User:", process.env.EMAIL_USER); // Terminal mein check karein
+console.log("Email User:", process.env.EMAIL_USER);
 
 const app = express();
-app.use(cors());
+
+// CORS setup
+app.use(cors({
+  origin: '*', // Allows all incoming requests from Nginx proxy
+  credentials: true
+}));
+
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect("mongodb://localhost:27017/techsathi")
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/techsathi";
+mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ TechSathi MongoDB Connected"))
     .catch(err => console.error("❌ DB Connection Error:", err));
 
-// Routes - Ensure the filename matches your folder!
-// If your file is named 'authRoute.js', use that name here:
+// Route Imports
 const authRoutes = require('./Routes/authRoute'); 
+const servicesroutes = require('./Routes/ServiceRoute');
 
+// API Mount Points
 app.use('/api', authRoutes);
-
-// Service Routes
-// const serviceRoutes = require('./Routes/ServiceRoute');
-const servicesroutes = require ('./Routes/ServiceRoute');
 app.use('/api', servicesroutes);
 
-// Use a fallback port if .env is missing
+// Server Listen
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+
+
+
+
+
+// const express = require('express');
+// const mongoose = require('mongoose');
+// const cors = require('cors');
+// require('dotenv').config();
+
+// console.log("Email User:", process.env.EMAIL_USER); // Terminal mein check karein
+
+// const app = express();
+// app.use(cors());
+
+// app.use(cors({
+//   origin: ['http://techsathibhopal.in', 'http://www.techsathibhopal.in', 'http://localhost:5173'],
+//   credentials: true
+// }));
+
+
+// app.use(express.json());
+
+// // MongoDB Connection
+// mongoose.connect("mongodb://localhost:27017/techsathi")
+//     .then(() => console.log("✅ TechSathi MongoDB Connected"))
+//     .catch(err => console.error("❌ DB Connection Error:", err));
+
+// // Routes - Ensure the filename matches your folder!
+// // If your file is named 'authRoute.js', use that name here:
+// const authRoutes = require('./Routes/authRoute'); 
+
+// app.use('/api', authRoutes);
+
+// // Service Routes
+// // const serviceRoutes = require('./Routes/ServiceRoute');
+// const servicesroutes = require ('./Routes/ServiceRoute');
+// app.use('/api', servicesroutes);
+
+// // Use a fallback port if .env is missing
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 
 
