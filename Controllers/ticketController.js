@@ -2,10 +2,10 @@ const Ticket = require('../Models/Ticket');
 
 exports.createTicket = async (req, res) => {
   try {
-    const { subject, address, userName, userPhone, lat, lng } = req.body || {};
-    const phone = String(userPhone || '').trim();
-    if (!String(subject || '').trim() || !String(address || '').trim() || !/^\d{10}$/.test(phone)) {
-      return res.status(400).json({ error: 'Issue, service address and a valid 10-digit phone number are required.' });
+    const { subject, address, lat, lng } = req.body || {};
+    if (typeof subject !== 'string' || !subject.trim() ||
+        typeof address !== 'string' || !address.trim()) {
+      return res.status(400).json({ error: 'Issue and service address are required.' });
     }
     const hasLat = lat !== null && lat !== undefined && lat !== '';
     const hasLng = lng !== null && lng !== undefined && lng !== '';
@@ -16,12 +16,11 @@ exports.createTicket = async (req, res) => {
         latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180)) {
       return res.status(400).json({ error: 'Invalid GPS coordinates.' });
     }
-
     const ticket = await Ticket.create({
-      subject: String(subject).trim().slice(0, 300),
-      address: String(address).trim().slice(0, 500),
-      requesterName: String(userName || '').trim().slice(0, 100) || undefined,
-      requesterPhone: phone,
+      subject: subject.trim().slice(0, 300),
+      address: address.trim().slice(0, 500),
+      requesterName: req.user.name,
+      requesterPhone: req.user.mobile,
       latitude,
       longitude
     });
