@@ -4,7 +4,7 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 100 },
   userName: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 40 },
   location: { type: String, required: true, trim: true, maxlength: 200 },
-  mobile: { type: String, required: true, unique: true, match: /^\\d{10}$/ },
+  mobile: { type: String, required: true, unique: true, match: /^\d{10}$/ },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
   isVerified: { type: Boolean, default: false },
   otpHash: { type: String, select: false },
