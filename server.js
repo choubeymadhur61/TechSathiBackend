@@ -25,11 +25,13 @@ app.use(express.json({ limit: '100kb' }));
 const authRoutes = require('./Routes/authRoute');
 const serviceRoutes = require('./Routes/ServiceRoute');
 const ticketRoutes = require('./Routes/ticketRoute');
+const leadRoutes = require('./Routes/leadRoute');
 
 app.get('/api/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 app.use('/api', authRoutes);
 app.use('/api', serviceRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/leads', leadRoutes);
 
 app.use((err, _req, res, _next) => {
   if (err.message === 'Origin not allowed by CORS') {
@@ -40,7 +42,7 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = Number(process.env.PORT) || 5000;
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 if (!MONGO_URI) {
   console.error('MONGO_URI is required. Server was not started.');
   process.exit(1);
