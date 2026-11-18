@@ -45,8 +45,8 @@ if (!MONGO_URI) {
   console.error('MONGO_URI is required. Server was not started.');
   process.exit(1);
 }
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  console.error('JWT_SECRET must be configured with at least 32 characters. Server was not started.');
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || !process.env.OTP_PEPPER || process.env.OTP_PEPPER.length < 32) {
+  console.error('JWT_SECRET and OTP_PEPPER must both be configured with at least 32 characters. Server was not started.');
   process.exit(1);
 }
 
