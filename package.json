@@ -1,21 +1,20 @@
 {
-  "name": "techsathi-bhopal-backend",
+  "name": "backend",
   "version": "1.0.0",
-  "private": true,
   "main": "server.js",
   "scripts": {
-    "test": "node --test",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["techsathi", "it-support", "bhopal"],
-  "license": "UNLICENSED",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "description": "TechSathiBhopal IT support and AMC API",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.5.0",
     "nodemailer": "^8.0.5"
