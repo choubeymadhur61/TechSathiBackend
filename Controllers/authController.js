@@ -54,6 +54,10 @@ exports.signup = async (req, res) => {
     const existing = await User.findOne({ $or: [{ email }, { mobile: String(mobile) }, { userName: userName.trim().toLowerCase() }] });
     if (existing?.isVerified) return res.status(409).json({ error: 'An account with these details already exists.' });
     if (existing && !existing.isVerified) {
+      const samePendingSignup = existing.email === email &&
+        existing.mobile === String(mobile) &&
+        existing.userName === userName.trim().toLowerCase();
+      if (!samePendingSignup) return res.status(409).json({ error: 'An account with these details already exists.' });
       await issueOTP(existing);
       return res.status(200).json({ message: 'A new verification code has been sent for your pending signup.' });
     }
