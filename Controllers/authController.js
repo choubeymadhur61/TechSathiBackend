@@ -52,7 +52,11 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ error: 'Please provide valid name, username, location, 10-digit mobile and email.' });
     }
     const existing = await User.findOne({ $or: [{ email }, { mobile: String(mobile) }, { userName: userName.trim().toLowerCase() }] });
-    if (existing) return res.status(409).json({ error: 'An account with these details already exists.' });
+    if (existing?.isVerified) return res.status(409).json({ error: 'An account with these details already exists.' });
+    if (existing && !existing.isVerified) {
+      await issueOTP(existing);
+      return res.status(200).json({ message: 'A new verification code has been sent for your pending signup.' });
+    }
     newUser = new User({
       name: name.trim(), userName: userName.trim().toLowerCase(),
       location: location.trim(), mobile: String(mobile), email, isVerified: false
