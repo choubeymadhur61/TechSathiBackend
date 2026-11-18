@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
-const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
+const hashOTP = (otp) => crypto.createHmac('sha256', process.env.OTP_PEPPER).update(otp).digest('hex');
 const safeEqual = (a, b) => {
   const left = Buffer.from(String(a));
   const right = Buffer.from(String(b));
