@@ -1,98 +1,142 @@
 const User = require('../Models/User');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+const crypto = require('crypto');
 
+const OTP_TTL_MS = 10 * 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
 
-// Helper function to send Email
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
+const safeEqual = (a, b) => {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+};
+const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[char]));
+
 const sendOTPEmail = async (email, otp, name) => {
-    // Check if variables exist
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        throw new Error("Missing EMAIL_USER or EMAIL_PASS in .env file");
-    }
-
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { 
-            user: process.env.EMAIL_USER, 
-            pass: process.env.EMAIL_PASS 
-        }
-    });
-
-    await transporter.sendMail({
-        from: `"TechSathi Support" <${process.env.EMAIL_USER}>`, // env variable use karein
-        to: email,
-        subject: 'Your Verification Code',
-        html: `<h3>Hello ${name},</h3><p>Your OTP is: <b>${otp}</b></p>`
-    });
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('Email service is not configured');
+  }
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+  });
+  await transporter.sendMail({
+    from: `"TechSathiBhopal" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: 'Your TechSathiBhopal verification code',
+    html: `<p>Hello ${escapeHtml(name || 'there')},</p><p>Your verification code is <strong>${otp}</strong>. It expires in 10 minutes.</p><p>If you did not request this code, you can ignore this email.</p>`
+  });
 };
 
-// SIGNUP LOGIC
+const issueOTP = async (user) => {
+  const otp = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+  user.otpHash = hashOTP(otp);
+  user.otpExpires = new Date(Date.now() + OTP_TTL_MS);
+  user.otpAttempts = 0;
+  await user.save();
+  await sendOTPEmail(user.email, otp, user.name);
+};
+
 exports.signup = async (req, res) => {
-    try {
-        const { name, userName, location, mobile, email } = req.body;
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
-        const newUser = new User({ 
-            name, userName, location, mobile, email, 
-            otp, otpExpires: Date.now() + 600000 
-        });
-
-        await newUser.save();
-        await sendOTPEmail(email, otp, name);
-        res.status(201).json({ message: "Signup successful! OTP sent to email." });
-    } catch (err) {
-        res.status(400).json({ error: err.message });
+  let newUser;
+  try {
+    const { name, userName, location, mobile } = req.body || {};
+    const email = normalizeEmail(req.body?.email);
+    if (!name?.trim() || !userName?.trim() || !location?.trim() ||
+        !/^\d{10}$/.test(String(mobile || '')) ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Please provide valid name, username, location, 10-digit mobile and email.' });
     }
+
+    const existing = await User.findOne({ $or: [{ email }, { mobile }, { userName: userName.trim().toLowerCase() }] });
+    if (existing) return res.status(409).json({ error: 'An account with these details already exists.' });
+
+    newUser = new User({
+      name: name.trim(),
+      userName: userName.trim().toLowerCase(),
+      location: location.trim(),
+      mobile: String(mobile),
+      email,
+      isVerified: false
+    });
+    await issueOTP(newUser);
+    return res.status(201).json({ message: 'Signup received. Check your email for the verification code.' });
+  } catch (err) {
+    if (newUser?._id) await User.deleteOne({ _id: newUser._id, isVerified: false }).catch(() => {});
+    if (err.code === 11000) return res.status(409).json({ error: 'An account with these details already exists.' });
+    console.error('Signup failed:', err.message);
+    return res.status(500).json({ error: 'Unable to complete signup. Please try again later.' });
+  }
 };
 
-// LOGIN LOGIC
 exports.loginOTP = async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
-
-        if (!user) return res.status(404).json({ error: "User not found!" });
-
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        user.otp = otp;
-        user.otpExpires = Date.now() + 600000;
-        await user.save();
-
-        await sendOTPEmail(email, otp, user.name);
-        res.status(200).json({ message: "Login OTP sent to email!" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Please provide a valid email address.' });
     }
+    const user = await User.findOne({ email, isVerified: true });
+    // Keep the response generic so account existence is not disclosed.
+    if (user) await issueOTP(user);
+    return res.status(200).json({ message: 'If a verified account exists, a verification code has been sent.' });
+  } catch (err) {
+    console.error('Login OTP request failed:', err.message);
+    return res.status(500).json({ error: 'Unable to process the request. Please try again later.' });
+  }
 };
 
-// VERIFY OTP LOGIC
 exports.verifyOTP = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-        const user = await User.findOne({ email, otp });
-
-        if (!user || user.otpExpires < Date.now()) {
-            return res.status(400).json({ error: "Invalid or expired OTP" });
-        }
-
-        user.isVerified = true;
-        user.otp = undefined; 
-        await user.save();
-
-        // 🛡️ GENERATE JWT TOKEN
-        const token = jwt.sign(
-            { userId: user._id, email: user.email },
-            process.env.JWT_SECRET, // We must add this to your .env file
-            { expiresIn: '7d' } // User stays logged in for 7 days
-        );
-
-        res.status(200).json({ 
-            message: "Verification successful!", 
-            token, // Send the token to the frontend
-            user: { name: user.name, email: user.email, location: user.location }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const otp = String(req.body?.otp || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ error: 'Invalid or expired verification code.' });
     }
+
+    const user = await User.findOne({ email }).select('+otpHash +otpExpires +otpAttempts');
+    if (!user || !user.otpHash || !user.otpExpires ||
+        user.otpExpires.getTime() <= Date.now() || user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(400).json({ error: 'Invalid or expired verification code.' });
+    }
+
+    if (!safeEqual(user.otpHash, hashOTP(otp))) {
+      user.otpAttempts += 1;
+      if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+        user.otpHash = undefined;
+        user.otpExpires = undefined;
+      }
+      await user.save();
+      return res.status(400).json({ error: 'Invalid or expired verification code.' });
+    }
+
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      console.error('JWT_SECRET must be configured with at least 32 characters.');
+      return res.status(503).json({ error: 'Authentication is temporarily unavailable.' });
+    }
+
+    user.isVerified = true;
+    user.otpHash = undefined;
+    user.otpExpires = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h', issuer: 'techsathibhopal' }
+    );
+    return res.status(200).json({
+      message: 'Verification successful.',
+      token,
+      user: { name: user.name, email: user.email, location: user.location }
+    });
+  } catch (err) {
+    console.error('OTP verification failed:', err.message);
+    return res.status(500).json({ error: 'Unable to verify the code. Please try again later.' });
+  }
 };
